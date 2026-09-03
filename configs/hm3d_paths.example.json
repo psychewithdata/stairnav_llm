@@ -1,0 +1,9 @@
+{
+  "scene_id": "/content/data/scene_datasets/hm3d/minival/00829-QaLdnwvtxbs/QaLdnwvtxbs.basis.glb",
+  "scene_dataset_config": "/content/data/scene_datasets/hm3d/hm3d_annotated_basis.scene_dataset_config.json",
+  "width": 640,
+  "height": 480,
+  "sensor_height": 1.25,
+  "forward_step_size": 0.25,
+  "turn_angle": 15.0
+}

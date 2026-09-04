@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+data/
+outputs/
+models/
+
+.env
+*.token
+*.secret
+
+*.zip
+*.tar
+*.tar.gz

@@ -1,184 +1,91 @@
-# Hướng Dẫn Chạy StairNav-LLM Trên Colab
+# Hướng Dẫn Chạy StairNav-HM3D Trên Colab
 
-Tài liệu này là hướng dẫn thực hành từ đầu đến cuối cho project:
-
-**StairNav-LLM: robot giao hàng trong tòa nhà, nhận lệnh tiếng Việt/voice, hỏi đáp trước khi di chuyển, dùng HM3D + Habitat-Sim để mô phỏng.**
-
-## 0. Bạn sẽ chạy theo 2 mức
-
-Đừng bắt đầu ngay bằng HM3D, vì Habitat-Sim và dataset khá nặng. Làm theo đúng thứ tự:
+Đây là quy trình mới, đã bỏ phần graph MVP. Mục tiêu là chạy trực tiếp với:
 
 ```text
-Mức A: Graph MVP
-  Chạy nhanh trên Colab Free.
-  Mục tiêu: kiểm tra parser, hỏi đáp, route planner, SayCan-lite.
-
-Mức B: HM3D + Habitat-Sim
-  Cần tải dataset HM3D và cài Habitat-Sim.
-  Mục tiêu: robot nhìn môi trường 3D thật hơn bằng RGB/depth/semantic.
+HM3D dataset + Habitat-Sim + command model training/testing + save/load model
 ```
 
-Nếu Mức A chưa chạy ổn, chưa nên làm Mức B.
+## 1. Chuẩn bị trước khi mở Colab
 
-## 1. Cấu trúc file hiện tại
+Bạn cần có:
 
-```text
-stairnav_llm/
-  README.md
-  HUONG_DAN_CHAY_COLAB.md
-  requirements.txt
+1. Một repo GitHub chứa thư mục `stairnav_llm`, hoặc file zip của thư mục này.
+2. Tài khoản Matterport đã được cấp quyền dùng **Habitat-Matterport 3D Research Dataset**.
+3. Matterport token gồm `MATTERPORT_TOKEN_ID` và `MATTERPORT_TOKEN_SECRET`.
 
-  notebooks/
-    StairNav_LLM_delivery_starter.ipynb
+Không đưa token lên GitHub.
 
-  src/
-    __init__.py
-    dialogue_policy.py
-    hm3d_dataset_builder.py
-    hm3d_habitat_adapter.py
-    interactive_delivery_loop.py
-    vision_map_fusion.py
+Dataset HM3D: `https://github.com/matterport/habitat-matterport-3dresearch`
 
-  configs/
-    hm3d_paths.example.json
+## 2. Mở Colab và chọn GPU
 
-  docs/
-    colab_setup.md
-    hm3d_habitat_setup.md
-    technical_contribution_proposal.md
-```
-
-File quan trọng nhất lúc bắt đầu:
-
-```text
-notebooks/StairNav_LLM_delivery_starter.ipynb
-```
-
-## 2. Cách đưa project lên Colab
-
-Bạn có 2 cách.
-
-### Cách 1: Dùng GitHub
-
-Trên máy local, tạo repo GitHub rồi push thư mục `stairnav_llm`.
-
-Sau đó trong Colab:
-
-```python
-!git clone https://github.com/YOUR_USERNAME/stairnav-llm.git
-%cd stairnav-llm
-```
-
-Nếu repo của bạn đặt tên khác thì đổi URL tương ứng.
-
-### Cách 2: Upload thủ công
-
-Nén thư mục `stairnav_llm` thành `.zip`, upload lên Colab, rồi giải nén:
-
-```python
-!unzip stairnav_llm.zip -d /content/
-%cd /content/stairnav_llm
-```
-
-## 3. Mức A - chạy Graph MVP trước
-
-### 3.1. Mở notebook
-
-Trong Colab, upload hoặc mở file:
-
-```text
-notebooks/StairNav_LLM_delivery_starter.ipynb
-```
-
-### 3.2. Chọn runtime
-
-Nếu chỉ chạy rule-based baseline:
-
-```text
-Runtime -> Change runtime type -> CPU
-```
-
-Nếu chạy local LLM:
+Trong Colab:
 
 ```text
 Runtime -> Change runtime type -> T4 GPU
 ```
 
-### 3.3. Cài thư viện
+## 3. Đưa project vào Colab
 
-Notebook đã có cell cài đặt. Nếu muốn cài bằng tay:
+### Cách A: clone GitHub
+
+```python
+!git clone https://github.com/YOUR_USERNAME/stairnav-llm.git
+%cd stairnav-llm/stairnav_llm
+```
+
+Nếu repo của bạn đặt `stairnav_llm` ở root, dùng:
+
+```python
+%cd stairnav-llm
+```
+
+### Cách B: upload zip thủ công
+
+Upload `stairnav_llm.zip`, rồi chạy:
+
+```python
+!unzip -q stairnav_llm.zip -d /content/
+%cd /content/stairnav_llm
+```
+
+Kiểm tra:
+
+```python
+!ls
+!ls notebooks
+!ls src
+```
+
+Bạn cần thấy:
+
+```text
+notebooks/StairNav_HM3D_Colab.ipynb
+src/hm3d_habitat_adapter.py
+src/hm3d_dataset_builder.py
+src/command_model.py
+```
+
+## 4. Mở notebook chính
+
+Mở file:
+
+```text
+notebooks/StairNav_HM3D_Colab.ipynb
+```
+
+Sau đó chạy từ trên xuống.
+
+## 5. Cài Python dependencies
 
 ```python
 !pip install -q -r requirements.txt
 ```
 
-### 3.4. Chạy lần đầu không dùng LLM
+## 6. Cài Habitat-Sim bằng conda
 
-Trong notebook, để:
-
-```python
-USE_LOCAL_LLM = False
-```
-
-Sau đó chọn:
-
-```text
-Runtime -> Run all
-```
-
-Bạn cần thấy các phần sau chạy được:
-
-```text
-building graph
-dataset lệnh tiếng Việt
-rule-based parser
-route planner
-clarification dialogue
-vision-map fusion mock
-SayCan-lite
-evaluation metrics
-```
-
-### 3.5. Chạy với local LLM
-
-Sau khi bản rule-based chạy ổn, đổi:
-
-```python
-USE_LOCAL_LLM = True
-MODEL_NAME = "Qwen/Qwen2.5-3B-Instruct"
-```
-
-Rồi chạy lại từ đầu trên T4 GPU.
-
-Nếu bị thiếu GPU RAM, dùng model nhỏ hơn:
-
-```python
-MODEL_NAME = "Qwen/Qwen2.5-1.5B-Instruct"
-```
-
-## 4. Mức B - setup HM3D + Habitat-Sim
-
-HM3D không phải dataset tải tự do ngay lập tức. Bạn cần token từ Matterport.
-
-### 4.1. Xin quyền HM3D
-
-Bạn cần:
-
-1. Tạo tài khoản Matterport.
-2. Xin quyền dùng **Habitat-Matterport 3D Research Dataset**.
-3. Tạo API token.
-4. Lưu lại:
-
-```text
-MATTERPORT_TOKEN_ID
-MATTERPORT_TOKEN_SECRET
-```
-
-Không commit token lên GitHub.
-
-### 4.2. Cài conda trong Colab
-
-Trong notebook Colab mới:
+Trong Colab, chạy:
 
 ```python
 !pip install -q condacolab
@@ -186,9 +93,11 @@ import condacolab
 condacolab.install()
 ```
 
-Colab sẽ restart kernel. Sau restart, chạy tiếp từ bước dưới.
+Colab sẽ restart runtime. Sau khi restart:
 
-### 4.3. Cài Habitat-Sim
+1. Chạy lại cell `%cd ...` để vào đúng project.
+2. Chạy lại cell cài `requirements.txt`.
+3. Chạy tiếp:
 
 ```python
 !conda install -y -c conda-forge -c aihabitat habitat-sim
@@ -201,11 +110,9 @@ import habitat_sim
 print("Habitat-Sim OK")
 ```
 
-Nếu lệnh cài bị lỗi, khả năng cao là do version Python/CUDA của Colab thay đổi. Khi đó giải pháp tốt hơn là chạy trong local Ubuntu/WSL2 bằng conda environment.
+Nếu lỗi ở bước này, thường là do version Python/CUDA của Colab thay đổi. Khi đó thử runtime mới hoặc chuyển sang local Ubuntu/WSL2 bằng conda.
 
-### 4.4. Tải test scene nhỏ trước
-
-Chưa tải HM3D vội. Test Habitat trước:
+## 7. Test Habitat-Sim trước khi tải HM3D
 
 ```python
 !python -m habitat_sim.utils.datasets_download \
@@ -213,9 +120,9 @@ Chưa tải HM3D vội. Test Habitat trước:
   --data-path data/
 ```
 
-Nếu cell này lỗi, dừng lại sửa Habitat-Sim trước.
+Nếu cell này lỗi, chưa tải HM3D. Sửa Habitat-Sim trước.
 
-### 4.5. Nhập token HM3D
+## 8. Nhập Matterport token
 
 ```python
 import os
@@ -225,9 +132,9 @@ os.environ["MATTERPORT_TOKEN_ID"] = getpass("Matterport token ID: ")
 os.environ["MATTERPORT_TOKEN_SECRET"] = getpass("Matterport token secret: ")
 ```
 
-### 4.6. Tải HM3D minival
+## 9. Tải HM3D minival
 
-Chỉ tải `minival` trước:
+Bắt đầu bằng minival:
 
 ```python
 !python -m habitat_sim.utils.datasets_download \
@@ -237,54 +144,36 @@ Chỉ tải `minival` trước:
   --data-path data/
 ```
 
-Sau khi tải xong, cấu trúc thường sẽ là:
+Sau khi tải, kiểm tra:
+
+```python
+!find data/scene_datasets/hm3d -maxdepth 3 -type f | head -30
+```
+
+Bạn cần thấy file dạng:
 
 ```text
-data/
-  scene_datasets/
-    hm3d/
-      hm3d_annotated_basis.scene_dataset_config.json
-      minival/
-        SCENE_FOLDER/
-          *.basis.glb
-          *.basis.navmesh
+*.basis.glb
+*.basis.navmesh
+hm3d_annotated_basis.scene_dataset_config.json
 ```
 
-## 5. Test HM3D Adapter
+## 10. Tìm scene HM3D
 
-Trong Colab, chạy:
+Notebook sẽ tự tìm scene:
 
 ```python
-from pathlib import Path
-import sys
-
-sys.path.append("/content/stairnav-llm/stairnav_llm/src")
-
 hm3d_root = Path("data/scene_datasets/hm3d")
 scene_dirs = sorted((hm3d_root / "minival").glob("[0-9]*-*"))
-
-print("Số scene:", len(scene_dirs))
-scene_dir = scene_dirs[0]
-scene_id = next(scene_dir.glob("*.basis.glb"))
+scene_id = next(scene_dirs[0].glob("*.basis.glb"))
 scene_config = hm3d_root / "hm3d_annotated_basis.scene_dataset_config.json"
-
-print("Scene:", scene_id)
-print("Config:", scene_config)
 ```
 
-Nếu bạn upload project thủ công và folder khác `/content/stairnav-llm`, sửa dòng:
+Nếu `scene_dirs` rỗng, dataset tải chưa đúng.
+
+## 11. Test Habitat adapter
 
 ```python
-sys.path.append("/content/stairnav-llm/stairnav_llm/src")
-```
-
-cho đúng đường dẫn thực tế.
-
-Tiếp theo:
-
-```python
-from hm3d_habitat_adapter import HabitatHM3DConfig, HabitatHM3DSimulator
-
 cfg = HabitatHM3DConfig(
     scene_id=str(scene_id),
     scene_dataset_config=str(scene_config),
@@ -295,171 +184,199 @@ cfg = HabitatHM3DConfig(
 sim = HabitatHM3DSimulator(cfg)
 obs = sim.reset()
 
-print("Agent position:", obs.agent_state.position)
-print("RGB shape:", None if obs.rgb is None else obs.rgb.shape)
-print("Depth shape:", None if obs.depth is None else obs.depth.shape)
-print("Semantic shape:", None if obs.semantic is None else obs.semantic.shape)
+print(obs.agent_state.position)
+print(obs.rgb.shape)
+print(obs.depth.shape)
+print(obs.semantic.shape)
 
 sim.close()
 ```
 
-Nếu đoạn này chạy được, bạn đã nối thành công HM3D + Habitat-Sim.
+Nếu chạy được, robot đã đọc được observation từ HM3D scene.
 
-## 6. Tạo một phần dataset HM3D để train/evaluate
-
-Chạy:
+## 12. Tạo dataset episode từ HM3D
 
 ```python
-from hm3d_dataset_builder import sample_delivery_episodes, save_jsonl
-
-sim = HabitatHM3DSimulator(cfg)
-
 episodes = sample_delivery_episodes(
     sim,
     scene_id=str(scene_id),
-    count=20,
+    count=80,
     seed=7,
     min_distance=2.0,
+    clarification_ratio=0.25,
 )
-
-save_jsonl(episodes, "data/stairnav_hm3d_minival_20.jsonl")
-sim.close()
-
-print("Số episode:", len(episodes))
-print(episodes[0])
 ```
 
-Kết quả là file:
+File sinh ra:
 
 ```text
-data/stairnav_hm3d_minival_20.jsonl
+data/stairnav_hm3d_minival_80.jsonl
 ```
 
-Mỗi dòng là một episode:
+## 13. Train/test command model
 
-```json
+```python
+result = train_command_models(
+    episode_jsonl=episode_file,
+    output_dir=MODEL_DIR,
+)
+```
+
+Model được train để dự đoán:
+
+```text
+needs_clarification_label
+item_label
+goal_label
+```
+
+Kết quả lưu ở:
+
+```text
+outputs/models/command_model.joblib
+outputs/models/command_model_metrics.json
+```
+
+## 14. Lưu model vào Google Drive
+
+```python
+from google.colab import drive
+
+drive.mount('/content/drive')
+
+DRIVE_OUT = Path('/content/drive/MyDrive/stairnav_llm_outputs')
+DRIVE_OUT.mkdir(parents=True, exist_ok=True)
+
+!cp -r outputs/models "$DRIVE_OUT/"
+!cp -r data "$DRIVE_OUT/"
+```
+
+Sau khi chạy, model sẽ nằm ở:
+
+```text
+MyDrive/stairnav_llm_outputs/models/command_model.joblib
+```
+
+## 15. Load model để chạy câu lệnh mới
+
+```python
+from command_model import predict_command
+
+model_file = MODEL_DIR / "command_model.joblib"
+
+command = "Đem tài liệu tới khu văn phòng ở cuối hành lang."
+print(predict_command(model_file, command))
+```
+
+Output ví dụ:
+
+```python
 {
-  "episode_id": "...",
-  "scene_id": "...basis.glb",
-  "start_position": [0.0, 0.0, 0.0],
-  "goal_position": [1.0, 0.0, 2.0],
-  "geodesic_distance": 5.2,
-  "instruction_vi": "Đem tài liệu tới khu văn phòng ở cuối hành lang.",
-  "item": "tài liệu",
-  "needs_clarification": false
+  "needs_clarification_label": "False",
+  "item_label": "tài liệu",
+  "goal_label": "khu văn phòng ở cuối hành lang"
 }
 ```
 
-## 7. Vòng hỏi đáp trước khi robot di chuyển
-
-Ví dụ:
+## 16. Robot hỏi đáp trước khi di chuyển
 
 ```python
 from dialogue_policy import DeliveryIntent, clarification_question, apply_user_clarification
 
-intent = DeliveryIntent(item=None, destination="R503")
+intent = DeliveryIntent(item=None, destination=None, recipient=None)
 
-q = clarification_question(intent)
-print("Robot:", q)
+question = clarification_question(intent)
+print("Robot:", question)
+
+intent = apply_user_clarification(intent, "phòng 503")
+question = clarification_question(intent)
+print("Robot:", question)
 
 intent = apply_user_clarification(intent, "tài liệu seminar")
-print("Intent sau khi hỏi đáp:", intent)
+question = clarification_question(intent)
+print("Đủ thông tin để đi:", question is None)
 ```
 
-Ý tưởng:
+Ý nghĩa:
 
 ```text
-User: Mang lên phòng 503 giúp tôi.
+User: Mang lên giúp tôi.
+Robot: Bạn muốn robot giao tới phòng nào hoặc cho người nhận nào?
+User: Phòng 503.
 Robot: Robot cần mang món gì?
 User: Tài liệu seminar.
-Robot: Xác nhận. Tôi sẽ giao tài liệu seminar tới phòng 503.
+Robot: Đã đủ thông tin, bắt đầu planning.
 ```
 
-Chỉ khi đủ thông tin, robot mới di chuyển.
-
-## 8. Lộ trình thực nghiệm cho paper
-
-Sau khi setup chạy được, làm theo thứ tự:
-
-```text
-Tuần 1:
-  Graph MVP + dialogue + SayCan-lite chạy ổn.
-
-Tuần 2:
-  HM3D minival chạy được, tạo 20-100 episode.
-
-Tuần 3:
-  Tạo 300-500 câu lệnh tiếng Việt.
-
-Tuần 4:
-  Thêm voice-to-text bằng faster-whisper.
-
-Tuần 5:
-  So sánh baseline:
-    rule-based
-    LLM direct path
-    LLM intent + planner
-    LLM intent + SayCan-lite
-    LLM + SayCan-lite + vision-map fusion
-
-Tuần 6:
-  Viết kết quả, bảng metric, error analysis.
-```
-
-## 9. Lỗi thường gặp
-
-### Không import được habitat_sim
-
-Nguyên nhân:
-
-```text
-Habitat-Sim chưa cài đúng môi trường conda.
-```
-
-Cách xử lý:
+## 17. Test đường đi bằng Habitat pathfinder
 
 ```python
-!conda install -y -c conda-forge -c aihabitat habitat-sim
+distance = sim.geodesic_distance(sample["start_position"], sample["goal_position"])
+print("Reachable:", distance < float("inf"))
 ```
 
-Nếu vẫn lỗi, chuyển sang local Ubuntu/WSL2.
+Ở giai đoạn này, Habitat pathfinder là oracle để xác nhận đường đi khả thi. Giai đoạn sau mới thay bằng learned navigation policy.
 
-### Không tải được HM3D
-
-Nguyên nhân thường gặp:
+## 18. Thứ tự cell cần chạy
 
 ```text
-Token sai, chưa có quyền dataset, hoặc biến môi trường chưa set.
+1. Clone/upload project
+2. pip install requirements
+3. condacolab install
+4. sau runtime restart: cd lại project
+5. conda install habitat-sim
+6. download habitat_test_scenes
+7. nhập Matterport token
+8. download hm3d_minival_v0.2
+9. tìm scene HM3D
+10. test Habitat adapter
+11. sample HM3D episodes
+12. train/test command model
+13. save model to Drive
+14. load model and predict new command
+15. dialogue-before-move demo
+16. geodesic reachability test
 ```
 
-Kiểm tra lại:
+## 19. Chạy lại model ở Colab session sau
+
+Mount Drive:
 
 ```python
-import os
-print(bool(os.environ.get("MATTERPORT_TOKEN_ID")))
-print(bool(os.environ.get("MATTERPORT_TOKEN_SECRET")))
+from google.colab import drive
+drive.mount('/content/drive')
 ```
 
-### Scene list rỗng
-
-Kiểm tra thư mục:
+Copy model về runtime:
 
 ```python
-!find data/scene_datasets/hm3d -maxdepth 3 -type f | head
+!mkdir -p outputs/models
+!cp /content/drive/MyDrive/stairnav_llm_outputs/models/command_model.joblib outputs/models/
 ```
 
-Nếu không thấy `.basis.glb`, dataset chưa tải đúng.
+Load model:
 
-## 10. Thứ tự bạn nên làm ngay
+```python
+from command_model import predict_command
 
-Làm đúng 5 bước này trước:
-
-```text
-1. Đưa folder stairnav_llm lên GitHub hoặc upload zip lên Colab.
-2. Mở notebook StairNav_LLM_delivery_starter.ipynb.
-3. Chạy USE_LOCAL_LLM=False.
-4. Nếu ổn, chạy USE_LOCAL_LLM=True với Qwen 1.5B hoặc 3B.
-5. Sau đó mới setup Habitat-Sim và tải HM3D minival.
+print(predict_command(
+    "outputs/models/command_model.joblib",
+    "Giao laptop tới khu văn phòng ở cuối hành lang."
+))
 ```
 
-Đừng tải HM3D train full ngay. Bắt đầu bằng minival để tiết kiệm thời gian và tránh vỡ setup.
+## 20. Khi nào tăng quy mô training?
+
+Sau khi notebook chạy ổn với 80 episode, tăng dần:
+
+```python
+count=500
+```
+
+rồi:
+
+```python
+count=1000
+```
+
+Không tăng ngay từ đầu. Hãy đảm bảo pipeline tải scene, sample episode, train model, save model đều ổn trước.

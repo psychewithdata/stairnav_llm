@@ -2,148 +2,134 @@
 
 ## Working Title
 
-StairNav-LLM: Vision- and Map-Grounded SayCan Planning for Vietnamese Voice-Guided Indoor Delivery Robots
+StairNav-HM3D: Dialogue-Before-Move Command Grounding for Vietnamese Indoor Delivery Robots in Habitat-Matterport 3D
 
 ## Core Problem
 
-Most LLM-robot demos translate a natural-language command directly into a path or action sequence. This is weak for a delivery robot in a real building because the LLM does not know whether:
+Most LLM-robot demos translate a user command directly into movement. For a delivery robot in an indoor building, this is risky because the command may be incomplete and the robot should not move until it knows:
 
-- a corridor is blocked
-- a stair/elevator transition is physically feasible
-- a room sign is actually visible
-- the user command is underspecified
-- the building map is stale or partially wrong
+- what item must be delivered
+- where the item should go
+- whether the target is reachable in the current HM3D scene
+- whether visual observations support the planned action
 
-The project should therefore study **grounded decision-making**, not only language parsing.
+The project therefore focuses on **dialogue-before-move grounding** in HM3D rather than a toy graph environment.
 
-## Main Technical Contribution
+## Main Contribution
 
-Combine three signals when selecting the robot's next skill:
-
-```text
-SayCan score = language score * affordance score
-affordance score = f(building map, robot visual observation, robot state)
-```
-
-In the original SayCan setting, affordance estimates whether a low-level manipulation skill is likely to succeed. In this project, affordance estimates whether an indoor navigation/delivery skill is likely to succeed:
-
-- move through a flat corridor
-- take stairs
-- take elevator
-- enter a target room
-- deliver item
-- ask a clarification question
-
-## Vision + Map Fusion
-
-The robot camera can provide:
-
-- OCR room-sign detection: "R503", "phòng 503", "lab robot"
-- landmark detection: stairs, elevator, lobby, corridor
-- obstacle detection: blocked corridor, broken elevator, crowded stair
-- confidence scores for each detection
-
-The building map provides:
-
-- node type: room, corridor, stairs, elevator, lobby
-- floor index
-- edge mode: flat, stairs, elevator
-- edge cost
-- known room aliases and recipient locations
-
-Fusion idea:
+The proposed contribution is a reproducible HM3D/Habitat-Sim pipeline for Vietnamese indoor delivery commands:
 
 ```text
-edge_affordance = base_map_feasibility(edge)
-                  * visual_support(edge_mode or landmark)
-                  * obstacle_penalty(edge)
+Vietnamese command
+  -> command model predicts missing slots and goal class
+  -> dialogue policy asks clarification if needed
+  -> Habitat-Sim observation provides RGB/depth/semantic state
+  -> Habitat pathfinder checks reachability
+  -> model and metrics are saved for later runs
 ```
+
+## Why HM3D
+
+HM3D provides realistic 3D scans of indoor spaces and integrates naturally with Habitat-Sim. This lets the project move beyond a hand-written graph and evaluate commands in real scanned environments.
+
+## Current Training Model
+
+The first trainable model is a lightweight reproducible baseline:
+
+- input: Vietnamese command text
+- features: TF-IDF character n-grams
+- classifiers: Logistic Regression
+- outputs:
+  - whether clarification is needed
+  - item class
+  - goal description class
+
+This baseline is intentionally simple so that stronger models can be compared fairly later.
+
+## Next Model Upgrades
+
+After the baseline runs:
+
+1. replace TF-IDF with Vietnamese transformer embeddings
+2. fine-tune PhoBERT or XLM-R for slot classification
+3. use Qwen/Llama instruction models for structured JSON parsing
+4. add faster-whisper for voice-to-text and measure ASR error propagation
+5. use Habitat RGB/semantic frames for visual goal grounding
 
 ## Research Questions
 
-1. Does vision-map fusion improve route success compared with map-only planning when the environment changes?
-2. Does SayCan-style skill selection reduce invalid actions compared with direct LLM path generation?
-3. Does clarification dialogue improve delivery success on underspecified Vietnamese voice commands?
-4. How sensitive is the system to ASR errors in Vietnamese commands?
+1. Does dialogue-before-move reduce wrong navigation attempts on underspecified Vietnamese commands?
+2. How well does a lightweight command model predict missing slots, item class, and goal class?
+3. How does performance change when commands come from ASR instead of clean text?
+4. Can HM3D semantic/RGB observations improve grounding compared with command text alone?
+5. How much does Habitat geodesic reachability filtering reduce invalid movement decisions?
 
 ## Experiments
 
-### E1: Map-only vs Vision+Map
+### E1: Clean Text Command Understanding
 
-Inject dynamic failures:
-
-- blocked corridor
-- elevator unavailable
-- stair unavailable
-- incorrect/missing room sign
-
-Compare:
-
-- shortest path on static map
-- replanning with visual blocked-edge detection
-- SayCan-lite with visual affordance
-
-### E2: LLM-only vs Grounded Planner
-
-Compare:
-
-- LLM directly outputs full path
-- LLM outputs structured intent, graph planner computes path
-- LLM + SayCan-lite selects skills step by step
-
-### E3: Clarification Dialogue
-
-Commands:
-
-- missing item: "Mang lên phòng 503 giúp tôi"
-- missing destination: "Giao gói hàng cho giảng viên"
-- ambiguous recipient: "Giao cho thầy ở lab"
+Train/test on HM3D-generated Vietnamese delivery episodes.
 
 Metrics:
 
 - clarification accuracy
-- false clarification rate
-- final delivery success after user answer
+- item accuracy
+- goal class accuracy
 
-### E4: Voice Robustness
+### E2: Dialogue Before Move
 
-Use faster-whisper or Whisper to transcribe Vietnamese audio commands.
+Compare:
+
+- direct move after command
+- ask clarification before move
+
+Metrics:
+
+- false movement rate
+- clarification success
+- final executable command rate
+
+### E3: Habitat Reachability
+
+Use Habitat-Sim pathfinder to check whether sampled goal positions are reachable.
+
+Metrics:
+
+- reachable episode rate
+- geodesic distance distribution
+- failed episode sampling rate
+
+### E4: Voice Input
+
+Use faster-whisper for Vietnamese ASR.
 
 Metrics:
 
 - WER/CER
-- intent accuracy after ASR
-- destination accuracy after ASR
-- delivery success after ASR
+- command-model accuracy after ASR
+- clarification accuracy after ASR
 
-## Minimum Publishable System
+### E5: Visual Grounding Extension
 
-For a serious paper target, build:
+Use Habitat RGB/depth/semantic observations for:
 
-- 50-100 synthetic building graphs
-- 1,000+ Vietnamese delivery commands
-- dynamic obstacle/failure generator
-- 4-6 baselines
-- open-source code and reproducible configs
-- error analysis with examples
+- room/area landmark detection
+- semantic goal matching
+- obstacle or navigability cues
 
-## Simulator Path
+Metrics:
 
-### Current notebook
+- text-only vs text+vision goal grounding
+- reachability-filtered success
+- failure case categories
 
-Graph simulator with simulated vision detections. Best for fast iteration and ablation.
+## Minimum Paper-Ready Target
 
-### SayCan-style simulation
+For a serious submission, aim for:
 
-Use the notebook's `saycan_select_skill` and `run_saycan_episode` functions as the first SayCan abstraction.
-
-### Physical/visual simulator extension
-
-After the graph version is stable, connect observations from:
-
-- Habitat-Sim for indoor navigation scenes
-- PyBullet for simple robot/body visualization
-- Genesis or ManiSkill for physics-based robot locomotion
-- Isaac Sim only if hardware/setup is available
-
-The graph/SayCan layer should remain independent from the simulator backend.
+- 10-20 HM3D scenes
+- 1,000-3,000 Vietnamese delivery commands
+- clean text and ASR-transcribed command variants
+- baseline command model plus transformer/LLM comparison
+- Habitat reachability evaluation
+- released code, dataset generation scripts, trained baseline artifact, and metrics

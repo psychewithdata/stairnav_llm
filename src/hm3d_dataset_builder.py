@@ -18,6 +18,7 @@ class HM3DDeliveryEpisode:
     geodesic_distance: float
     instruction_vi: str
     item: str
+    goal_description: str
     needs_clarification: bool
     preferred_vertical_mode: str | None = None
 
@@ -39,6 +40,13 @@ GOAL_DESCRIPTIONS = [
     "vị trí được đánh dấu trong bản đồ",
 ]
 
+CLARIFICATION_TEMPLATES = [
+    "Giao gói hàng này giúp tôi.",
+    "Mang món này tới cho giảng viên.",
+    "Đem lên giúp tôi.",
+    "Robot giao đồ tới phòng đó nhé.",
+]
+
 
 def _vec3_to_list(value: Any) -> list[float]:
     return [float(value[0]), float(value[1]), float(value[2])]
@@ -54,6 +62,10 @@ def make_instruction(item: str, goal_description: str, rng: random.Random) -> st
     return rng.choice(templates).format(item=item, goal=goal_description)
 
 
+def make_clarification_instruction(rng: random.Random) -> str:
+    return rng.choice(CLARIFICATION_TEMPLATES)
+
+
 def sample_delivery_episodes(
     sim: HabitatHM3DSimulator,
     *,
@@ -61,6 +73,7 @@ def sample_delivery_episodes(
     count: int,
     seed: int = 7,
     min_distance: float = 2.0,
+    clarification_ratio: float = 0.2,
     max_attempts_per_episode: int = 100,
 ) -> list[HM3DDeliveryEpisode]:
     """Sample navigable start/goal pairs from an HM3D scene."""
@@ -76,6 +89,7 @@ def sample_delivery_episodes(
             if distance >= min_distance and distance < float("inf"):
                 item = rng.choice(ITEMS)
                 goal_description = rng.choice(GOAL_DESCRIPTIONS)
+                needs_clarification = rng.random() < clarification_ratio
                 episodes.append(
                     HM3DDeliveryEpisode(
                         episode_id=f"{Path(scene_id).stem}_{episode_idx:05d}",
@@ -83,9 +97,14 @@ def sample_delivery_episodes(
                         start_position=_vec3_to_list(start),
                         goal_position=_vec3_to_list(goal),
                         geodesic_distance=float(distance),
-                        instruction_vi=make_instruction(item, goal_description, rng),
-                        item=item,
-                        needs_clarification=False,
+                        instruction_vi=(
+                            make_clarification_instruction(rng)
+                            if needs_clarification
+                            else make_instruction(item, goal_description, rng)
+                        ),
+                        item="" if needs_clarification else item,
+                        goal_description=goal_description,
+                        needs_clarification=needs_clarification,
                     )
                 )
                 break

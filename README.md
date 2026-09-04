@@ -1,102 +1,99 @@
-# StairNav-LLM
+# StairNav-HM3D
 
-Voice-guided LLM planning for a simulated indoor delivery robot in multi-floor buildings, moving from a graph MVP to HM3D + Habitat-Sim visual simulation.
+Vietnamese voice/text command understanding and dialogue-before-navigation for an indoor delivery robot in HM3D scenes using Habitat-Sim.
 
-This project evolves the original ViVLN starter notebook from outdoor alley navigation to a stair-aware building delivery setting. The MVP uses a topological building graph; the main research simulator target is Habitat-Sim with HM3D scenes.
+## Goal
 
-## Research Question
+Build a simulated delivery robot that:
 
-Can a language-guided robot delivery agent understand Vietnamese voice commands, ground them to a multi-floor building map, ask clarification questions when commands are underspecified, and plan valid stair/elevator-aware routes?
-
-## MVP Pipeline
-
-```text
-Voice/text command
-  -> Vietnamese command parser or local LLM planner
-  -> structured delivery intent
-  -> clarification dialogue if needed
-  -> vision + building-map affordance fusion
-  -> SayCan-style stair/elevator-aware skill selection
-  -> graph simulator execution
-  -> SR / SPL / clarification accuracy metrics
-```
-
-## Technical Contribution Direction
-
-The strongest research contribution is not simply "LLM controls a robot". The project studies how an LLM planner can be grounded by both:
-
-- a structured building map with rooms, floors, stairs, elevators, and weighted edges
-- robot visual observations such as room signs, stair/elevator detections, and blocked corridors
-
-The notebook includes a SayCan-style scoring prototype:
-
-```text
-score(skill) = language_score(skill | instruction) * affordance_score(skill | map, vision, robot_state)
-```
-
-This lets the agent prefer actions that are linguistically relevant and physically/topologically feasible.
+1. receives a Vietnamese command such as "Đem tài liệu tới khu văn phòng ở cuối hành lang",
+2. asks clarification questions before moving if the item or destination is missing,
+3. grounds the command in an HM3D indoor scene,
+4. uses Habitat-Sim observations and pathfinder for simulation,
+5. trains/tests a reusable command-understanding model,
+6. saves the trained model so it can be loaded again for later runs.
 
 ## Main Notebook
 
-- `notebooks/StairNav_LLM_delivery_starter.ipynb`
-- Detailed Vietnamese setup guide: `HUONG_DAN_CHAY_COLAB.md`
+- `notebooks/StairNav_HM3D_Colab.ipynb`
 
-Run this notebook from top to bottom on Colab. The default mode uses a rule-based baseline so the full pipeline runs quickly. After that, set:
+This is now the only notebook workflow. The previous graph MVP notebook has been removed.
 
-```python
-USE_LOCAL_LLM = True
+## Project Structure
+
+```text
+stairnav_llm/
+  README.md
+  HUONG_DAN_CHAY_COLAB.md
+  requirements.txt
+
+  notebooks/
+    StairNav_HM3D_Colab.ipynb
+
+  src/
+    __init__.py
+    command_model.py
+    dialogue_policy.py
+    hm3d_dataset_builder.py
+    hm3d_habitat_adapter.py
+    interactive_delivery_loop.py
+    vision_map_fusion.py
+
+  configs/
+    hm3d_paths.example.json
+
+  docs/
+    hm3d_habitat_setup.md
+    technical_contribution_proposal.md
 ```
 
-to test an open-weight local LLM such as `Qwen/Qwen2.5-3B-Instruct`.
+## Pipeline
 
-## HM3D + Habitat-Sim Track
+```text
+HM3D scene
+  -> Habitat-Sim RGB/depth/semantic observations
+  -> sampled delivery episodes
+  -> Vietnamese command dataset
+  -> train/test command model
+  -> save model to outputs/models/command_model.joblib
+  -> load model for new command
+  -> dialogue policy asks missing questions
+  -> Habitat pathfinder checks navigability
+```
 
-Use HM3D as the visual indoor dataset and Habitat-Sim/Habitat-Lab as the accurate simulator stack.
+## Training Artifact
 
-New files:
+The Colab notebook saves:
 
-- `src/hm3d_habitat_adapter.py`: Habitat-Sim RGB-D-semantic navigation adapter
-- `src/hm3d_dataset_builder.py`: sample HM3D start/goal delivery episodes into JSONL
-- `src/vision_map_fusion.py`: map + visual affordance scoring
-- `src/dialogue_policy.py`: ask-before-moving dialogue policy
-- `src/interactive_delivery_loop.py`: minimal dialogue-before-navigation loop
-- `configs/hm3d_paths.example.json`: sample Habitat/HM3D path config
-- `HUONG_DAN_CHAY_COLAB.md`: step-by-step Colab setup
-- `docs/hm3d_habitat_setup.md`: HM3D/Habitat technical notes
+```text
+outputs/models/command_model.joblib
+outputs/models/command_model_metrics.json
+data/stairnav_hm3d_minival_80.jsonl
+```
 
-Recommended development order:
+It also includes a Google Drive cell to preserve these files after the Colab runtime disconnects.
 
-1. Run the graph notebook and debug command/dialogue/planning.
-2. Download HM3D minival after getting Matterport academic access.
-3. Use `HabitatHM3DSimulator` to collect RGB/depth/semantic observations.
-4. Use `sample_delivery_episodes(...)` to build a small HM3D JSONL training/evaluation subset.
-5. Replace simulated detections with detector/OCR output from Habitat frames.
-6. Run SayCan-style action selection inside Habitat-Sim.
+## Current Model
 
-## Baselines
+The first training model is intentionally lightweight:
 
-- Rule-based parser + weighted shortest path
-- Local LLM command parser + weighted shortest path
-- Local LLM planner + path validator
-- Clarification-aware planner for missing destination or missing item
-- Map-only planner vs vision-map fusion planner
-- SayCan-lite skill selection vs direct path generation
+- TF-IDF character n-grams
+- Logistic Regression classifiers
+- labels: clarification needed, item class, goal description class
 
-## Metrics
+This gives a reproducible baseline before replacing it with PhoBERT, Qwen embeddings, or LoRA fine-tuning.
 
-- Valid path rate
-- Success Rate
-- SPL
-- Clarification accuracy
-- Stair/elevator preference adherence
-- Affordance calibration under blocked corridors/elevator failures
-- Recovery rate after visual obstacle detection
+## Research Contribution Direction
 
-## Next Steps
+The technical contribution should be:
 
-1. Expand the Vietnamese command dataset to 100-300 samples.
-2. Compare Qwen 2.5/3B, Qwen 3/8B, Llama 3.1/8B, and API-based LLMs if available.
-3. Add faster-whisper for Vietnamese voice-to-text.
-4. Replace simulated detections with a real/simulated vision module: OCR room signs, obstacle detection, stair/elevator detection.
-5. Connect the planner to HM3D scenes in Habitat-Sim.
-6. Add Habitat-Lab evaluation episodes and train/evaluate policies on HM3D subsets.
+> Dialogue-before-move command grounding for Vietnamese indoor delivery robots in HM3D, with Habitat-Sim visual observations and reusable trained command models.
+
+Next upgrades:
+
+- add faster-whisper for speech-to-text
+- add visual room/landmark detection from Habitat RGB frames
+- add semantic-map grounding from HM3D semantic observations
+- compare text-only vs voice
+- compare map/pathfinder oracle vs learned navigation policy
+- integrate SayCan-style skill scoring using language confidence times visual/navigation affordance

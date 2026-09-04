@@ -1,22 +1,18 @@
-# HM3D + Habitat-Sim Setup
+# HM3D + Habitat-Sim Technical Notes
 
-## Why Habitat-Sim
+## Dataset
 
-For this project, Habitat-Sim/Habitat-Lab should be the main simulator because HM3D is a native Habitat dataset and Habitat provides RGB, depth, semantic sensors, navmesh/pathfinder, and navigation tasks.
+HM3D is the Habitat-Matterport 3D Research Dataset. It provides realistic indoor 3D scenes for academic, non-commercial research.
 
-Use the graph notebook for fast ablations. Use Habitat-Sim for visual navigation and realistic indoor observations.
+Use this order:
 
-## Dataset Access
+```text
+hm3d_minival_v0.2 -> hm3d_val_v0.2 -> hm3d_train_v0.2
+```
 
-HM3D is an academic, non-commercial dataset released by Matterport and Facebook AI Research. You need Matterport access and an API token before downloading.
+Start with `hm3d_minival_v0.2`.
 
-Recommended first split:
-
-- `hm3d_minival_v0.2`, small enough for early testing
-- then `hm3d_val_v0.2`
-- only use `hm3d_train_v0.2` when the pipeline is stable
-
-Expected Habitat-Lab structure:
+## Expected Folder Layout
 
 ```text
 data/
@@ -24,13 +20,14 @@ data/
     hm3d/
       hm3d_annotated_basis.scene_dataset_config.json
       minival/
-      val/
-      train/
+        008xx-.../
+          *.basis.glb
+          *.basis.navmesh
+          *.semantic.glb
+          *.semantic.txt
 ```
 
-## Download Example
-
-After generating a Matterport API token:
+## Download Command
 
 ```bash
 python -m habitat_sim.utils.datasets_download \
@@ -40,61 +37,53 @@ python -m habitat_sim.utils.datasets_download \
   --data-path data/
 ```
 
-Never commit token values to GitHub.
+## Simulator Adapter
 
-## How HM3D Fits This Project
+The file `src/hm3d_habitat_adapter.py` wraps Habitat-Sim with:
 
-HM3D scenes provide the robot's visual world:
+- RGB camera
+- depth camera
+- semantic camera
+- `reset()`
+- `step(action)`
+- `geodesic_distance(start, goal)`
 
-- RGB camera images
-- depth observations
-- semantic observations when semantic annotations are available
-- navigable mesh and geodesic distances
+The first navigation evaluation uses Habitat pathfinder as an oracle. Later work can replace this with a learned Habitat-Lab navigation policy.
 
-The project layer adds:
+## Dataset Builder
 
-- Vietnamese voice/text commands
-- delivery intent parsing
-- dialogue before movement
-- building-level topological abstraction
-- SayCan-style language score times visual-map affordance score
+The file `src/hm3d_dataset_builder.py` samples:
 
-## Training Data From HM3D
+- random navigable start positions
+- random navigable goal positions
+- geodesic distance
+- Vietnamese delivery instructions
+- clarification-needed examples
 
-Use only a subset first:
+It saves JSONL episodes that can be used for training and testing command-understanding models.
 
-1. Sample 10-20 HM3D minival scenes.
-2. Sample navigable start and goal positions.
-3. Extract RGB/depth snapshots near doors, rooms, stairs, corridors.
-4. Create synthetic Vietnamese delivery commands around those goals.
-5. Label whether the command is clear or requires clarification.
+## Model Training
 
-Minimum fields:
-
-```json
-{
-  "scene_id": "...basis.glb",
-  "start_position": [0.0, 0.0, 0.0],
-  "goal_position": [1.0, 0.0, 2.0],
-  "instruction_vi": "Đem tài liệu tới khu văn phòng ở cuối hành lang.",
-  "needs_clarification": false,
-  "preferred_vertical_mode": null
-}
-```
-
-## Simulation Loop
+The file `src/command_model.py` trains a baseline command model:
 
 ```text
-User voice command
-  -> ASR text
-  -> dialogue policy checks missing slots
-  -> LLM produces delivery intent
-  -> Habitat observation gives RGB/depth/semantic evidence
-  -> vision module extracts landmarks/obstacles
-  -> SayCan-style selector chooses next action
-  -> Habitat-Sim executes action
+Vietnamese instruction -> clarification label / item label / goal label
 ```
 
-## Immediate Limitation
+Saved artifacts:
 
-HM3D contains realistic 3D scans, but it is not automatically a labeled "building delivery" dataset. The research value comes from creating the delivery-language layer and grounding it in HM3D visual/navigation data.
+```text
+outputs/models/command_model.joblib
+outputs/models/command_model_metrics.json
+```
+
+## Dialogue Before Movement
+
+The files `src/dialogue_policy.py` and `src/interactive_delivery_loop.py` implement the rule:
+
+```text
+If command is missing item or destination, ask first.
+Only move after required slots are filled.
+```
+
+This is the current human-robot interaction contribution.
